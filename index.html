@@ -7,54 +7,55 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1e1e24;
-            color: #f5f5f5;
+            background-color: #0f172a;
+            color: #f8fafc;
             max-width: 800px;
             margin: 40px auto;
             padding: 20px;
         }
-        h1, h2 { color: #f9a825; }
+        h1, h2 { color: #38bdf8; }
         .box {
-            background-color: #2a2a35;
+            background-color: #1e293b;
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
             margin-bottom: 20px;
+            border: 1px solid #334155;
         }
         input[type="file"] {
             display: block;
             margin: 15px 0;
-            color: #ddd;
+            color: #cbd5e1;
         }
         button {
-            background-color: #f9a825;
-            color: #1e1e24;
+            background-color: #0284c7;
+            color: #ffffff;
             border: none;
             padding: 10px 20px;
             font-size: 16px;
             font-weight: bold;
             border-radius: 4px;
             cursor: pointer;
-            transition: 0.2s;
+            transition: background-color 0.2s;
         }
-        button:hover { background-color: #fff; }
+        button:hover { background-color: #38bdf8; }
         textarea {
             width: 100%;
             height: 300px;
-            background-color: #111;
-            color: #00ff00;
+            background-color: #020617;
+            color: #38bdf8;
             font-family: 'Courier New', Courier, monospace;
             padding: 10px;
-            border: 1px solid #444;
+            border: 1px solid #334155;
             border-radius: 4px;
             box-sizing: border-box;
         }
-        #status { font-style: italic; color: #aaa; margin-top: 10px; }
+        #status { font-style: italic; color: #94a3b8; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-    <h1>🎵 MP3 to VEXcode IQ Python Converter</h1>
+    <h1>MP3 to VEXcode IQ Python Converter</h1>
     <p>Upload a clean, single-instrument audio file (like an MP3 of a piano tune or melody). The webpage will extract the pitch pitches and auto-generate clean code for your robot brain.</p>
 
     <div class="box">
@@ -65,7 +66,7 @@
     </div>
 
     <div class="box">
-        <h2>📋 Copy and Paste into VEXcode IQ:</h2>
+        <h2>Copy and Paste into VEXcode IQ:</h2>
         <textarea id="outputCode" readonly placeholder="# Python code will appear here after conversion..."></textarea>
     </div>
 
@@ -78,7 +79,7 @@ const Pitchfinder = {
         return function(float32Data) {
             const bufferSize = float32Data.length;
             const halfBufferSize = Math.floor(bufferSize / 2);
-            const yinBuffer = new Float32Array(halfBufferSize);
+            let yinBuffer = new Float32Array(halfBufferSize);
             let i, tau;
             for (tau = 0; tau < halfBufferSize; tau++) {
                 for (i = 0; i < halfBufferSize; i++) {
@@ -86,7 +87,6 @@ const Pitchfinder = {
                     yinBuffer[tau] += delta * delta;
                 }
             }
-            yinBuffer[0] = 1;
             let runningSum = 0;
             for (tau = 1; tau < halfBufferSize; tau++) {
                 runningSum += yinBuffer[tau];
@@ -105,7 +105,7 @@ const Pitchfinder = {
             }
             if (period === -1) {
                 let minTau = 1;
-                let minVal = yinBuffer[1];
+                let minVal = yinBuffer[0];
                 for (tau = 2; tau < halfBufferSize; tau++) {
                     if (yinBuffer[tau] < minVal) {
                         minVal = yinBuffer[tau];
