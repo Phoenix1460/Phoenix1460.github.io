@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VEXcode IQ Music Converter</title>
-    <!-- Include Pitchfinder library to analyze frequencies from raw audio -->
-    <script src="https://jsdelivr.net"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -71,7 +69,60 @@
         <textarea id="outputCode" readonly placeholder="# Python code will appear here after conversion..."></textarea>
     </div>
 
+<!-- Embedded Pitchfinder Library (Bypasses CDN Network Blocks) -->
 <script>
+const Pitchfinder = {
+    YIN: function(config) {
+        const sampleRate = config.sampleRate || 44100;
+        const threshold = config.threshold || 0.1;
+        return function(float32Data) {
+            const bufferSize = float32Data.length;
+            const halfBufferSize = Math.floor(bufferSize / 2);
+            const yinBuffer = new Float32Array(halfBufferSize);
+            let i, tau;
+            for (tau = 0; tau < halfBufferSize; tau++) {
+                for (i = 0; i < halfBufferSize; i++) {
+                    const delta = float32Data[i] - float32Data[i + tau];
+                    yinBuffer[tau] += delta * delta;
+                }
+            }
+            yinBuffer[0] = 1;
+            let runningSum = 0;
+            for (tau = 1; tau < halfBufferSize; tau++) {
+                runningSum += yinBuffer[tau];
+                yinBuffer[tau] *= tau / runningSum;
+            }
+            let probability = 1, period = -1;
+            for (tau = 1; tau < halfBufferSize; tau++) {
+                if (yinBuffer[tau] < threshold) {
+                    while (tau + 1 < halfBufferSize && yinBuffer[tau + 1] < yinBuffer[tau]) {
+                        tau++;
+                    }
+                    period = tau;
+                    probability = 1 - yinBuffer[tau];
+                    break;
+                }
+            }
+            if (period === -1) {
+                let minTau = 1;
+                let minVal = yinBuffer[1];
+                for (tau = 2; tau < halfBufferSize; tau++) {
+                    if (yinBuffer[tau] < minVal) {
+                        minVal = yinBuffer[tau];
+                        minTau = tau;
+                    }
+                }
+                period = minTau;
+                probability = 1 - minVal;
+            }
+            if (probability > 0.85) {
+                return sampleRate / period;
+            }
+            return null;
+        };
+    }
+};
+
 async function processAudio() {
     const fileInput = document.getElementById('audioFile');
     const statusDiv = document.getElementById('status');
@@ -87,7 +138,13 @@ async function processAudio() {
     
     // Initialize Web Audio API
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const arrayBuffer = await file.arrayBuffer();
+    let arrayBuffer;
+    try {
+        arrayBuffer = await file.arrayBuffer();
+    } catch (e) {
+        statusDiv.textContent = "Error reading the file matrix.";
+        return;
+    }
     
     statusDiv.textContent = "Decoding audio data (this can take a moment)...";
     let audioBuffer;
@@ -99,25 +156,19 @@ async function processAudio() {
     }
 
     statusDiv.textContent = "Analyzing note frequencies and timing details...";
-    const float32Data = audioBuffer.getChannelData(0); // Analyze the primary mono channel
+    const float32Data = audioBuffer.getChannelData(0); 
     const sampleRate = audioBuffer.sampleRate;
     
-    // Set up Pitchfinder's YIN algorithm for steady, tracking notes
     const detectPitch = Pitchfinder.YIN({ sampleRate: sampleRate });
-    const chunkSize = 2048; // Time window step sizing
-    let currentTime = 0;
+    const chunkSize = 2048; 
     let songSequence = [];
 
-    // Step through the audio array chunks
     for (let i = 0; i < float32Data.length; i += chunkSize) {
         const chunk = float32Data.subarray(i, i + chunkSize);
         const frequency = detectPitch(chunk);
         
         if (frequency) {
-            // Convert exact Hz frequency directly into a digital MIDI Note Number
             const midiNote = Math.round(12 * (Math.log2(frequency / 440)) + 69);
-            
-            // Filter out tracking noise or out-of-range notes
             if (midiNote >= 24 && midiNote <= 108) {
                 const timestampMs = Math.round((i / sampleRate) * 1000);
                 songSequence.push({ note: midiNote, time: timestampMs });
@@ -132,29 +183,23 @@ async function processAudio() {
 
     statusDiv.textContent = "Compiling notes into structural VEXcode delays...";
     
-    // Setup the foundation headers of our final script output block
     let finalCode = `myVariable = 0\n\ndef play_song():\n`;
     let lastTime = 0;
-    const defaultDuration = 250; // Milliseconds per rhythmic slice
+    const defaultDuration = 250; 
 
-    // Group close matches and parse consecutive steps safely
     for (let i = 0; i < songSequence.length; i++) {
         let currentItem = songSequence[i];
         
-        // Only trigger a new note call if the pitch changes or a pause occurred
         if (i === 0 || songSequence[i].note !== songSequence[i-1].note || (currentItem.time - lastTime) > 300) {
             let waitDelay = currentItem.time - lastTime;
             
-            // Inject structural resting pacing
             if (waitDelay > 30 && i > 0) {
                 finalCode += `    wait(${waitDelay}, MSEC)\n`;
             }
             
-            // Process the VEX IQ math limits dynamically
             let octave = Math.floor((currentItem.note - 12) / 12);
             let vexNote = currentItem.note % 12;
             
-            // Constrain limits neatly so the brain speaker doesn't fault out
             if (octave < 3) octave = 3;
             if (octave > 7) octave = 7;
 
@@ -165,7 +210,6 @@ async function processAudio() {
 
     finalCode += `\nplay_song()\n`;
     
-    // Output directly onto UI display elements
     outputArea.value = finalCode;
     statusDiv.textContent = "Done! Code fully optimized for VEXcode IQ.";
 }
