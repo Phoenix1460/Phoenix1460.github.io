@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VEXcode IQ Music Converter</title>
+    <!-- Include Pitchfinder library to analyze frequencies from raw audio -->
+    <script src="https://jsdelivr.net"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e24;
+            color: #f5f5f5;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+        }
+        h1, h2 { color: #f9a825; }
+        .box {
+            background-color: #2a2a35;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            display: block;
+            margin: 15px 0;
+            color: #ddd;
+        }
+        button {
+            background-color: #f9a825;
+            color: #1e1e24;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button:hover { background-color: #fff; }
+        textarea {
+            width: 100%;
+            height: 300px;
+            background-color: #111;
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 10px;
+            border: 1px solid #444;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        #status { font-style: italic; color: #aaa; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1>🎵 MP3 to VEXcode IQ Python Converter</h1>
+    <p>Upload a clean, single-instrument audio file (like an MP3 of a piano tune or melody). The webpage will extract the pitch pitches and auto-generate clean code for your robot brain.</p>
+
+    <div class="box">
+        <label for="audioFile"><strong>Select Audio File (.mp3, .wav):</strong></label>
+        <input type="file" id="audioFile" accept="audio/*">
+        <button onclick="processAudio()">Convert to VEXcode Python</button>
+        <div id="status">Ready.</div>
+    </div>
+
+    <div class="box">
+        <h2>📋 Copy and Paste into VEXcode IQ:</h2>
+        <textarea id="outputCode" readonly placeholder="# Python code will appear here after conversion..."></textarea>
+    </div>
+
+<script>
+async function processAudio() {
+    const fileInput = document.getElementById('audioFile');
+    const statusDiv = document.getElementById('status');
+    const outputArea = document.getElementById('outputCode');
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Please select an audio file first!");
+        return;
+    }
+
+    statusDiv.textContent = "Reading audio file channels...";
+    const file = fileInput.files[0];
+    
+    // Initialize Web Audio API
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const arrayBuffer = await file.arrayBuffer();
+    
+    statusDiv.textContent = "Decoding audio data (this can take a moment)...";
+    let audioBuffer;
+    try {
+        audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    } catch (e) {
+        statusDiv.textContent = "Error decoding audio. Make sure it's a standard audio track.";
+        return;
+    }
+
+    statusDiv.textContent = "Analyzing note frequencies and timing details...";
+    const float32Data = audioBuffer.getChannelData(0); // Analyze the primary mono channel
+    const sampleRate = audioBuffer.sampleRate;
+    
+    // Set up Pitchfinder's YIN algorithm for steady, tracking notes
+    const detectPitch = Pitchfinder.YIN({ sampleRate: sampleRate });
+    const chunkSize = 2048; // Time window step sizing
+    let currentTime = 0;
+    let songSequence = [];
+
+    // Step through the audio array chunks
+    for (let i = 0; i < float32Data.length; i += chunkSize) {
+        const chunk = float32Data.subarray(i, i + chunkSize);
+        const frequency = detectPitch(chunk);
+        
+        if (frequency) {
+            // Convert exact Hz frequency directly into a digital MIDI Note Number
+            const midiNote = Math.round(12 * (Math.log2(frequency / 440)) + 69);
+            
+            // Filter out tracking noise or out-of-range notes
+            if (midiNote >= 24 && midiNote <= 108) {
+                const timestampMs = Math.round((i / sampleRate) * 1000);
+                songSequence.push({ note: midiNote, time: timestampMs });
+            }
+        }
+    }
+
+    if (songSequence.length === 0) {
+        statusDiv.textContent = "Could not detect clear musical notes. Try a simpler solo instrument track.";
+        return;
+    }
+
+    statusDiv.textContent = "Compiling notes into structural VEXcode delays...";
+    
+    // Setup the foundation headers of our final script output block
+    let finalCode = `myVariable = 0\n\ndef play_song():\n`;
+    let lastTime = 0;
+    const defaultDuration = 250; // Milliseconds per rhythmic slice
+
+    // Group close matches and parse consecutive steps safely
+    for (let i = 0; i < songSequence.length; i++) {
+        let currentItem = songSequence[i];
+        
+        // Only trigger a new note call if the pitch changes or a pause occurred
+        if (i === 0 || songSequence[i].note !== songSequence[i-1].note || (currentItem.time - lastTime) > 300) {
+            let waitDelay = currentItem.time - lastTime;
+            
+            // Inject structural resting pacing
+            if (waitDelay > 30 && i > 0) {
+                finalCode += `    wait(${waitDelay}, MSEC)\n`;
+            }
+            
+            // Process the VEX IQ math limits dynamically
+            let octave = Math.floor((currentItem.note - 12) / 12);
+            let vexNote = currentItem.note % 12;
+            
+            // Constrain limits neatly so the brain speaker doesn't fault out
+            if (octave < 3) octave = 3;
+            if (octave > 7) octave = 7;
+
+            finalCode += `    brain.play_note(${octave}, ${vexNote}, ${defaultDuration})\n`;
+            lastTime = currentItem.time + defaultDuration;
+        }
+    }
+
+    finalCode += `\nplay_song()\n`;
+    
+    // Output directly onto UI display elements
+    outputArea.value = finalCode;
+    statusDiv.textContent = "Done! Code fully optimized for VEXcode IQ.";
+}
+</script>
+
+</body>
+</html>
