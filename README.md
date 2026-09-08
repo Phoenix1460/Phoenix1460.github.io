@@ -1,0 +1,1 @@
+this is basically just a converter for vexIQ where you upload a mp3 file for a song and it turns it into a python code you can paste into vexcodeiq and it will play that song (not the actual audio because that is not possible but a piano-version of it)
