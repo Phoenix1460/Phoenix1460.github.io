@@ -102,7 +102,7 @@
     <div class="box">
         <div class="input-group">
             <label for="youtubeUrl">Option 1: Paste YouTube Video URL</label>
-            <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=...">
+            <input type="text" id="youtubeUrl" placeholder="https://youtube.com...">
         </div>
         
         <div class="divider">OR</div>
@@ -121,8 +121,8 @@
         <textarea id="outputCode" readonly placeholder="# Python code will appear here after conversion..."></textarea>
     </div>
 
+<!-- Embedded Pitchfinder Library (Self-Contained) -->
 <script>
-// Self-contained Pitchfinder Implementation
 const Pitchfinder = {
     YIN: function(config) {
         const sampleRate = config.sampleRate || 44100;
@@ -184,10 +184,10 @@ async function processInput() {
     if (youtubeUrl) {
         statusDiv.textContent = "Extracting stream identifiers from YouTube URL...";
         
-        // Extract the 11 character video ID matching standard formats
+        // Extract the video ID matching standard desktop or mobile link formats
         const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
         const match = youtubeUrl.match(regExp);
-        const videoId = (match && match[2].length === 11) ? match[2] : null;
+        const videoId = (match && match[2] && match[2].length === 11) ? match[2] : null;
 
         if (!videoId) {
             alert("Please enter a valid YouTube URL format.");
@@ -197,7 +197,6 @@ async function processInput() {
 
         statusDiv.textContent = "Fetching audio from remote proxy streams...";
         try {
-            // Utilizing a secure public server to bypass browser CORS network blocks
             const proxyApiUrl = `https://cobalt.tools`;
             const response = await fetch(proxyApiUrl, {
                 method: 'POST',
@@ -206,7 +205,7 @@ async function processInput() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    url: `https://youtube.com{videoId}`,
+                    url: `https://youtube.com${videoId}`,
                     isAudioOnly: true,
                     audioFormat: 'mp3'
                 })
@@ -234,7 +233,6 @@ async function processInput() {
         return;
     }
 
-    // Pass the populated array buffer into our established core logic pipeline
     await analyzeAudioData(arrayBuffer);
 }
 
@@ -278,3 +276,35 @@ async function analyzeAudioData(arrayBuffer) {
         return;
     }
 
+    statusDiv.textContent = "Compiling notes into structural VEXcode delays...";
+    
+    let finalCode = `myVariable = 0\n\ndef play_song():\n`;
+    let lastTime = 0;
+    const defaultDuration = 250; 
+
+    for (let i = 0; i < songSequence.length; i++) {
+        let currentItem = songSequence[i];
+        
+        if (i === 0 || songSequence[i].note !== songSequence[i-1].note || (currentItem.time - lastTime) > 300) {
+            let waitDelay = currentItem.time - lastTime;
+            
+            if (waitDelay > 30 && i > 0) {
+                finalCode += "    wait(" + waitDelay + ", MSEC)\n";
+            }
+            
+            let octave = Math.floor((currentItem.note - 12) / 12);
+            let vexNote = currentItem.note % 12;
+            
+            if (octave < 3) octave = 3;
+            if (octave > 7) octave = 7;
+
+            finalCode += "    brain.play_note(" + octave + ", " + vexNote + ", " + defaultDuration + ")\n";
+            lastTime = currentItem.time + defaultDuration;
+        }
+    }
+
+    finalCode += "\nplay_song()\n";
+    
+    outputArea.value = finalCode;
+    statusDiv.textContent = "Done! Code fully optimized for VEXcode IQ.";
+}
