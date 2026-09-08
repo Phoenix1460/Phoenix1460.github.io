@@ -22,62 +22,21 @@
             margin-bottom: 20px;
             border: 1px solid #334155;
         }
-        .input-group {
-            margin-bottom: 20px;
-        }
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
-        }
-        input[type="text"] {
-            width: 100%;
-            padding: 10px;
-            background-color: #0f172a;
-            border: 1px solid #334155;
-            border-radius: 4px;
-            color: #f8fafc;
-            box-sizing: border-box;
-            font-size: 14px;
-        }
-        input[type="text"]:focus {
-            outline: none;
-            border-color: #38bdf8;
-        }
-        .divider {
-            text-align: center;
-            margin: 15px 0;
-            color: #64748b;
-            font-weight: bold;
-            position: relative;
-        }
-        .divider::before, .divider::after {
-            content: "";
-            position: absolute;
-            top: 50%;
-            width: 42%;
-            height: 1px;
-            background-color: #334155;
-        }
-        .divider::before { left: 0; }
-        .divider::after { right: 0; }
         input[type="file"] {
             display: block;
-            margin: 10px 0;
+            margin: 15px 0;
             color: #cbd5e1;
         }
         button {
             background-color: #0284c7;
             color: #ffffff;
             border: none;
-            padding: 12px 24px;
+            padding: 10px 20px;
             font-size: 16px;
             font-weight: bold;
             border-radius: 4px;
             cursor: pointer;
             transition: background-color 0.2s;
-            width: 100%;
-            margin-top: 10px;
         }
         button:hover { background-color: #38bdf8; }
         textarea {
@@ -91,28 +50,18 @@
             border-radius: 4px;
             box-sizing: border-box;
         }
-        #status { font-style: italic; color: #94a3b8; margin-top: 12px; font-size: 14px; }
+        #status { font-style: italic; color: #94a3b8; margin-top: 10px; }
     </style>
 </head>
 <body>
 
     <h1>MP3 to VEXcode IQ Python Converter</h1>
-    <p>Upload a local audio file or paste a YouTube link containing a clean, single-instrument melody. The tool will parse the frequencies and output organized code block structures.</p>
+    <p>Upload a clean, single-instrument audio file (like an MP3 of a piano tune or melody). The webpage will extract the pitch pitches and auto-generate clean code for your robot brain.</p>
 
     <div class="box">
-        <div class="input-group">
-            <label for="youtubeUrl">Option 1: Paste YouTube Video URL</label>
-            <input type="text" id="youtubeUrl" placeholder="https://youtube.com...">
-        </div>
-        
-        <div class="divider">OR</div>
-
-        <div class="input-group">
-            <label for="audioFile">Option 2: Select Local Audio File (.mp3, .wav)</label>
-            <input type="file" id="audioFile" accept="audio/*">
-        </div>
-
-        <button onclick="processInput()">Convert to VEXcode Python</button>
+        <label for="audioFile"><strong>Select Audio File (.mp3, .wav):</strong></label>
+        <input type="file" id="audioFile" accept="audio/*">
+        <button onclick="processAudio()">Convert to VEXcode Python</button>
         <div id="status">Ready.</div>
     </div>
 
@@ -121,7 +70,7 @@
         <textarea id="outputCode" readonly placeholder="# Python code will appear here after conversion..."></textarea>
     </div>
 
-<!-- Embedded Pitchfinder Library (Self-Contained) -->
+<!-- Embedded Pitchfinder Library (Bypasses CDN Network Blocks) -->
 <script>
 const Pitchfinder = {
     YIN: function(config) {
@@ -156,7 +105,7 @@ const Pitchfinder = {
             }
             if (period === -1) {
                 let minTau = 1;
-                let minVal = yinBuffer;
+                let minVal = yinBuffer[0];
                 for (tau = 2; tau < halfBufferSize; tau++) {
                     if (yinBuffer[tau] < minVal) {
                         minVal = yinBuffer[tau];
@@ -174,79 +123,35 @@ const Pitchfinder = {
     }
 };
 
-async function processInput() {
-    const youtubeUrl = document.getElementById('youtubeUrl').value.trim();
+async function processAudio() {
     const fileInput = document.getElementById('audioFile');
-    const statusDiv = document.getElementById('status');
-
-    let arrayBuffer;
-
-    if (youtubeUrl) {
-        statusDiv.textContent = "Extracting stream identifiers from YouTube URL...";
-        
-        // Extract the video ID matching standard desktop or mobile link formats
-        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-        const match = youtubeUrl.match(regExp);
-        const videoId = (match && match[2] && match[2].length === 11) ? match[2] : null;
-
-        if (!videoId) {
-            alert("Please enter a valid YouTube URL format.");
-            statusDiv.textContent = "Error: Invalid URL.";
-            return;
-        }
-
-        statusDiv.textContent = "Fetching audio from remote proxy streams...";
-        try {
-            const proxyApiUrl = `https://cobalt.tools`;
-            const response = await fetch(proxyApiUrl, {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    url: `https://youtube.com${videoId}`,
-                    isAudioOnly: true,
-                    audioFormat: 'mp3'
-                })
-            });
-
-            const data = await response.json();
-            if (data && data.url) {
-                statusDiv.textContent = "Downloading audio stream into browser buffer memory...";
-                const audioFetch = await fetch(data.url);
-                arrayBuffer = await audioFetch.arrayBuffer();
-            } else {
-                throw new Error("Proxy fetch failed");
-            }
-        } catch (error) {
-            console.error(error);
-            statusDiv.textContent = "Streaming service timed out. Please fall back to uploading an MP3 directly.";
-            return;
-        }
-    } else if (fileInput.files && fileInput.files.length > 0) {
-        statusDiv.textContent = "Reading local file array buffers...";
-        const file = fileInput.files[0];
-        arrayBuffer = await file.arrayBuffer();
-    } else {
-        alert("Please provide a YouTube link or choose a local audio track.");
-        return;
-    }
-
-    await analyzeAudioData(arrayBuffer);
-}
-
-async function analyzeAudioData(arrayBuffer) {
     const statusDiv = document.getElementById('status');
     const outputArea = document.getElementById('outputCode');
 
-    statusDiv.textContent = "Decoding audio data stream structure...";
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Please select an audio file first!");
+        return;
+    }
+
+    statusDiv.textContent = "Reading audio file channels...";
+    const file = fileInput.files[0];
+    
+    // Initialize Web Audio API
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let arrayBuffer;
+    try {
+        arrayBuffer = await file.arrayBuffer();
+    } catch (e) {
+        statusDiv.textContent = "Error reading the file matrix.";
+        return;
+    }
+    
+    statusDiv.textContent = "Decoding audio data (this can take a moment)...";
     let audioBuffer;
     try {
         audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
     } catch (e) {
-        statusDiv.textContent = "Decoding error. Make sure the file format is standard audio data.";
+        statusDiv.textContent = "Error decoding audio. Make sure it's a standard audio track.";
         return;
     }
 
@@ -289,7 +194,7 @@ async function analyzeAudioData(arrayBuffer) {
             let waitDelay = currentItem.time - lastTime;
             
             if (waitDelay > 30 && i > 0) {
-                finalCode += "    wait(" + waitDelay + ", MSEC)\n";
+                finalCode += `    wait(${waitDelay}, MSEC)\n`;
             }
             
             let octave = Math.floor((currentItem.note - 12) / 12);
@@ -298,13 +203,17 @@ async function analyzeAudioData(arrayBuffer) {
             if (octave < 3) octave = 3;
             if (octave > 7) octave = 7;
 
-            finalCode += "    brain.play_note(" + octave + ", " + vexNote + ", " + defaultDuration + ")\n";
+            finalCode += `    brain.play_note(${octave}, ${vexNote}, ${defaultDuration})\n`;
             lastTime = currentItem.time + defaultDuration;
         }
     }
 
-    finalCode += "\nplay_song()\n";
+    finalCode += `\nplay_song()\n`;
     
     outputArea.value = finalCode;
     statusDiv.textContent = "Done! Code fully optimized for VEXcode IQ.";
 }
+</script>
+
+</body>
+</html>
