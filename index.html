@@ -101,26 +101,27 @@ async function processFile(isCompress) {
         return;
     }
 
-    let finalBlob;
+    let finalBuffer;
     let finalFileName = '';
 
-    if (isCompress) {
-        const cs = new CompressionStream('gzip');
-        finalBlob = new Blob([loadedBlob.stream().pipeThrough(cs)]);
-        finalFileName = loadedFileName + '.compressed';
-    } else {
-        try {
+    try {
+        if (isCompress) {
+            const cs = new CompressionStream('gzip');
+            const stream = loadedBlob.stream().pipeThrough(cs);
+            const response = new Response(stream);
+            finalBuffer = await response.arrayBuffer();
+            finalFileName = loadedFileName + '.compressed';
+        } else {
             const ds = new DecompressionStream('gzip');
-            finalBlob = new Blob([loadedBlob.stream().pipeThrough(ds)]);
+            const stream = loadedBlob.stream().pipeThrough(ds);
+            const response = new Response(stream);
+            finalBuffer = await response.arrayBuffer();
             finalFileName = loadedFileName.replace('.compressed', '') || 'decompressed.txt';
-        } catch (e) {
-            alert('Error during decompression. Is this a valid compressed file?');
-            return;
         }
+    } catch (e) {
+        alert('Error processing file. Ensure it is a valid format.');
+        return;
     }
-
-    // Force arrayBuffer execution to update statistics panel correctly
-    const finalBuffer = await finalBlob.arrayBuffer();
     
     let origSize = loadedBlob.size;
     let newSize = finalBuffer.byteLength;
@@ -131,8 +132,9 @@ async function processFile(isCompress) {
                       'Ratio: ' + (origSize / newSize).toFixed(2) + 'x';
     stats.style.display = 'block';
 
+    let blob = new Blob([finalBuffer], { type: 'application/octet-stream' });
     let link = document.createElement('a');
-    link.href = URL.createObjectURL(finalBlob);
+    link.href = URL.createObjectURL(blob);
     link.download = finalFileName;
     link.click();
 }
