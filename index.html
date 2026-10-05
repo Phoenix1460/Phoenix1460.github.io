@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>File Storage Optimizer</title>
+    <script src="https://cloudflare.com"></script>
     <style>
         body {
             font-family: -apple-system, sans-serif;
@@ -103,23 +104,19 @@ async function processFile(isCompress) {
 
     let finalBuffer;
     let finalFileName = '';
+    
+    const fileData = new Uint8Array(await loadedBlob.arrayBuffer());
 
     try {
         if (isCompress) {
-            const cs = new CompressionStream('gzip');
-            const stream = loadedBlob.stream().pipeThrough(cs);
-            const response = new Response(stream);
-            finalBuffer = await response.arrayBuffer();
+            finalBuffer = pako.deflate(fileData, { level: 9, memLevel: 9 });
             finalFileName = loadedFileName + '.compressed';
         } else {
-            const ds = new DecompressionStream('gzip');
-            const stream = loadedBlob.stream().pipeThrough(ds);
-            const response = new Response(stream);
-            finalBuffer = await response.arrayBuffer();
+            finalBuffer = pako.inflate(fileData);
             finalFileName = loadedFileName.replace('.compressed', '') || 'decompressed.txt';
         }
     } catch (e) {
-        alert('Error processing file. Ensure it is a valid format.');
+        alert('Processing error. Check if the file matches the operation.');
         return;
     }
     
