@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Code Compressor & Decompressor</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f6f8fa;
+            color: #24292e;
+        }
+        h1 { border-bottom: 1px solid #e1e4e8; padding-bottom: 10px; }
+        .container { display: flex; flex-direction: column; gap: 15px; }
+        textarea {
+            width: 100%;
+            height: 180px;
+            padding: 10px;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 14px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            box-sizing: border-box;
+            resize: vertical;
+        }
+        .actions { display: flex; gap: 10px; }
+        button {
+            background-color: #2ea44f;
+            color: white;
+            border: 1px solid rgba(27,31,35,.15);
+            border-radius: 6px;
+            padding: 6px 14px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        button:hover { background-color: #2c974b; }
+        button.secondary { background-color: #0366d6; }
+        button.secondary:hover { background-color: #0256b4; }
+        .stats {
+            background-color: #fff;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 15px;
+            font-size: 14px;
+        }
+        .badge {
+            background-color: #dbedff;
+            color: #0366d6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Custom Code Storage Optimizer</h1>
+    <p>Paste repetitive code, boilerplate configuration profiles, or logs below to compress them efficiently using our custom byte-dictionary mapping schema.</p>
+
+    <div class="container">
+        <div>
+            <label style="font-weight: bold; display: block; margin-bottom: 5px;">Raw / Uncompressed Input Text:</label>
+            <textarea id="inputText" placeholder="Paste highly repetitive text or code blocks here... Copy and paste a paragraph or code snippet 5 or 10 times to watch the 5x+ scaling factor engine clear the bloat."></textarea>
+        </div>
+
+        <div class="actions">
+            <button onclick="executeCompression()">⚡ Compress Data</button>
+            <button class="secondary" onclick="executeDecompression()">🔓 Decompress Data</button>
+            <button style="background-color: #6a737d;" onclick="loadSampleText()">Load Repetitive Demo Code</button>
+        </div>
+
+        <div class="stats" id="statsPanel" style="display: none;">
+            <strong>Compression Engine Metrics:</strong><br>
+            Original Footprint Size: <span id="origSize">0</span> bytes<br>
+            Compressed File/String Size: <span id="compSize">0</span> bytes<br>
+            Storage Optimization Ratio: <span id="ratio" class="badge">0x</span>
+        </div>
+
+        <div>
+            <label style="font-weight: bold; display: block; margin-bottom: 5px;">Compressed / Encoded Output (Custom Base64 Envelope Package):</label>
+            <textarea id="outputText" placeholder="Compressed serialization package output display..."></textarea>
+        </div>
+    </div>
+
+<script>
+/**
+ * Custom Compression Algorithm Engine
+ * Tokenizes repeating substrings down into structured lookups using unassigned high-byte values.
+ */
+class CustomCompressor {
+    static compress(string) {
+        if (!string) return '';
+        
+        let initialSize = string.length;
+        let dictionary = {};
+        let dictCount = 256; 
+        
+        // Find repeating word tokens or code patterns of reasonable length
+        let patterns = string.match(/\b\w{4,}\b|[{}[\]()<>=\s]{4,}/g) || [];
+        // Unique frequency matrix map
+        let frequencies = {};
+        patterns.forEach(p => { frequencies[p] = (frequencies[p] || 0) + 1; });
+        
+        // Sort by length * frequency yield to target biggest space-savers first
+        let sortedPatterns = Object.keys(frequencies).sort((a, b) => {
+            return (b.length * frequencies[b]) - (a.length * frequencies[a]);
+        });
+
+        let compressedText = string;
+        let mappingTable = [];
+
+        // Dynamic code token assignment strategy 
+        for (let pattern of sortedPatterns) {
+            if (frequencies[pattern] > 1 && dictCount < 1000) {
+                let uniqueToken = `\x01${dictCount}\x02`; 
+                if (compressedText.includes(pattern)) {
+                    compressedText = compressedText.split(pattern).join(uniqueToken);
+                    mappingTable.push(`${dictCount}:${pattern}`);
+                    dictCount++;
+                }
+            }
+        }
+
+        // Return a customized unified storage package envelope: [Dictionary]|||[Payload]
+        let packagePayload = mappingTable.join('\x03') + '|||' + compressedText;
+        return btoa(unescape(encodeURIComponent(packagePayload)));
+    }
+
+    static decompress(base64Package) {
+        if (!base64Package) return '';
+        try {
+            let decodedPackage = decodeURIComponent(escape(atob(base64Package)));
+            let parts = decodedPackage.split('|||');
+            let dictRaw = parts[0];
+            let payload = parts[1];
+
+            if (!dictRaw) return payload;
+
+            let mappings = dictRaw.split('\x03');
+            let dictionary = {};
+            
+            mappings.forEach(m => {
+                let kv = m.split(':');
+                if (kv[0]) dictionary[kv[0]] = kv.slice(1).join(':');
+            });
+
+            // Reconstruct and step through structural lookups sequentially in reverse
+            let loops = 0;
+            let changesOccurred = true;
+            while (changesOccurred && loops < 10) {
+                changesOccurred = false;
+                for (let tokenKey in dictionary) {
+                    let targetToken = `\x01${tokenKey}\x02`;
+                    if (payload.includes(targetToken)) {
+                        payload = payload.split(targetToken).join(dictionary[tokenKey]);
+                        changesOccurred = true;
+                    }
+                }
+                loops++;
+            }
+            return payload;
+        } catch(e) {
+            alert("Error parsing or validating custom storage package format: " + e.message);
+            return '';
+        }
+    }
+}
+
+function executeCompression() {
+    let input = document.getElementById('inputText').value;
+    if(!input) return alert("Please specify target input text payload first.");
+    
+    let compressed = CustomCompressor.compress(input);
+    document.getElementById('outputText').value = compressed;
+    
+    // Performance Calculations
+    let origLen = new Blob([input]).size;
+    let compLen = new Blob([compressed]).size;
+    let savingsFactor = (origLen / compLen).toFixed(2);
+    
+    document.getElementById('origSize').innerText = origLen;
+    document.getElementById('compSize').innerText = compLen;
+    document.getElementById('ratio').innerText = savingsFactor + 'x Shrunk';
+    document.getElementById('statsPanel').style.display = 'block';
+}
+
+function executeDecompression() {
+    let outputField = document.getElementById('outputText').value;
+    if(!outputField) return alert("Please supply a compressed storage string package window package element.");
+    
+    let decryptedText = CustomCompressor.decompress(outputField);
+    document.getElementById('inputText').value = decryptedText;
+}
+
+function loadSampleText() {
+    let boilerplate = `function initApplicationContext() {
+    console.log("Booting system sub-processes...");
+    const globalConfigurationSettingValue = "PRODUCTION_ENV_STABLE_VERIFIED";
+    const serviceEndpointLocationUrlAddress = "https://internal.local";
+    console.log("Establishing remote pipelines to: " + serviceEndpointLocationUrlAddress);
+    return { status: globalConfigurationSettingValue, active: true };
+}\n`;
+    // Repeat the identical codebase sequence 12 times to mirror deep repeating code scenarios
+    document.getElementById('inputText').value = boilerplate.repeat(12);
+}
+</script>
+</body>
+</html>
