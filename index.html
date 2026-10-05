@@ -65,14 +65,13 @@
     <div id="stats" class="stats"></div>
 
 <script>
-let loadedContent = '';
+let loadedBlob = null;
 let loadedFileName = '';
 
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
 
 dropZone.addEventListener('click', () => fileInput.click());
-
 fileInput.addEventListener('change', (e) => handleFiles(e.target.files));
 
 dropZone.addEventListener('dragover', (e) => {
@@ -92,88 +91,39 @@ function handleFiles(files) {
     if (!files.length) return;
     const file = files[0];
     loadedFileName = file.name;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        loadedContent = e.target.result;
-        dropZone.textContent = 'Selected: ' + file.name;
-    };
-    reader.readAsText(file);
+    loadedBlob = file;
+    dropZone.textContent = 'Selected: ' + file.name;
 }
 
-class StorageEngine {
-    static compress(string) {
-        if (!string) return '';
-        let patterns = string.match(/\b\w{4,}\b|[{}[\]()<>=\s]{4,}/g) || [];
-        let frequencies = {};
-        patterns.forEach(p => { frequencies[p] = (frequencies[p] || 0) + 1; });
-        let sortedPatterns = Object.keys(frequencies).sort((a, b) => (b.length * frequencies[b]) - (a.length * frequencies[a]));
-        let compressedText = string;
-        let mappingTable = [];
-        let dictCount = 256;
-
-        for (let pattern of sortedPatterns) {
-            if (frequencies[pattern] > 1 && dictCount < 1000) {
-                let uniqueToken = `\x01${dictCount}\x02`;
-                if (compressedText.includes(pattern)) {
-                    compressedText = compressedText.split(pattern).join(uniqueToken);
-                    mappingTable.push(`${dictCount}:${pattern}`);
-                    dictCount++;
-                }
-            }
-        }
-        let packagePayload = mappingTable.join('\x03') + '|||' + compressedText;
-        return btoa(unescape(encodeURIComponent(packagePayload)));
-    }
-
-    static decompress(base64Package) {
-        if (!base64Package) return '';
-        let decodedPackage = decodeURIComponent(escape(atob(base64Package)));
-        let parts = decodedPackage.split('|||');
-        let dictRaw = parts[0];
-        let payload = parts[1];
-        if (!dictRaw) return payload;
-        let mappings = dictRaw.split('\x03');
-        let dictionary = {};
-        mappings.forEach(m => {
-            let kv = m.split(':');
-            if (kv[0]) dictionary[kv[0]] = kv.slice(1).join(':');
-        });
-        let loops = 0;
-        let changesOccurred = true;
-        while (changesOccurred && loops < 10) {
-            changesOccurred = false;
-            for (let tokenKey in dictionary) {
-                let targetToken = `\x01${tokenKey}\x02`;
-                if (payload.includes(targetToken)) {
-                    payload = payload.split(targetToken).join(dictionary[tokenKey]);
-                    changesOccurred = true;
-                }
-            }
-            loops++;
-        }
-        return payload;
-    }
-}
-
-function processFile(isCompress) {
-    if (!loadedContent) {
+async function processFile(isCompress) {
+    if (!loadedBlob) {
         alert('Please drop a file first.');
         return;
     }
 
-    let output = '';
+    let finalBlob;
     let finalFileName = '';
 
     if (isCompress) {
-        output = StorageEngine.compress(loadedContent);
+        const cs = new CompressionStream('gzip');
+        finalBlob = new Blob([loadedBlob.stream().pipeThrough(cs)]);
         finalFileName = loadedFileName + '.compressed';
     } else {
-        output = StorageEngine.decompress(loadedContent);
-        finalFileName = loadedFileName.replace('.compressed', '') || 'decompressed.txt';
+        try {
+            const ds = new DecompressionStream('gzip');
+            finalBlob = new Blob([loadedBlob.stream().pipeThrough(ds)]);
+            finalFileName = loadedFileName.replace('.compressed', '') || 'decompressed.txt';
+        } catch (e) {
+            alert('Error during decompression. Is this a valid compressed file?');
+            return;
+        }
     }
 
-    let origSize = new Blob([loadedContent]).size;
-    let newSize = new Blob([output]).size;
+    // Force arrayBuffer execution to update statistics panel correctly
+    const finalBuffer = await finalBlob.arrayBuffer();
+    
+    let origSize = loadedBlob.size;
+    let newSize = finalBuffer.byteLength;
     
     let stats = document.getElementById('stats');
     stats.innerHTML = 'Original size: ' + origSize + ' bytes<br>' +
@@ -181,9 +131,8 @@ function processFile(isCompress) {
                       'Ratio: ' + (origSize / newSize).toFixed(2) + 'x';
     stats.style.display = 'block';
 
-    let blob = new Blob([output], { type: 'text/plain' });
     let link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
+    link.href = URL.createObjectURL(finalBlob);
     link.download = finalFileName;
     link.click();
 }
